@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>住所録</title>
+<style>
+body{font-family:-apple-system,BlinkMacSystemFont,sans-serif;margin:0;background:#f4f4f4;color:#111}header{background:#111;color:#fff;padding:14px}main{padding:12px;max-width:800px;margin:auto}.card{background:#fff;border-radius:12px;padding:14px;margin:12px 0;box-shadow:0 1px 4px #0002}label{display:block;margin-top:10px}input,textarea{width:100%;box-sizing:border-box;font-size:16px;padding:10px;border:1px solid #bbb;border-radius:8px}textarea{height:70px}button{font-size:16px;padding:10px 12px;margin:8px 5px 0 0;border:0;border-radius:8px;background:#0f62fe;color:#fff}.gray{background:#666}.red{background:#c62828}.light{background:#e5e7eb;color:#111}.item{border:1px solid #ddd;border-radius:10px;padding:10px;margin:8px 0;background:white}.name{font-size:18px;font-weight:bold}.meta{font-size:14px;line-height:1.6;white-space:pre-wrap}.note{font-size:13px;color:#555}#status{font-weight:bold;color:#116329;margin-top:8px}
+</style>
+</head>
+<body>
+<header><h1>住所録</h1></header>
+<main>
+<section class="card"><h2 id="mode">新規登録</h2>
+<label>氏名</label><input id="name">
+<label>会社名</label><input id="company">
+<label>電話番号</label><input id="tel">
+<label>メール</label><input id="email">
+<label>住所</label><input id="address">
+<label>メモ</label><textarea id="memo"></textarea>
+<button id="save">保存</button><button id="clear" class="gray">入力クリア</button><div id="status"></div><div class="note">氏名だけでも保存できます。データはこの端末のブラウザに保存されます。</div></section>
+<section class="card"><label>検索</label><input id="search" placeholder="名前・会社名・電話など"><button id="csv" class="light">CSV出力</button><button id="backup" class="light">バックアップ出力</button><button id="restore" class="light">バックアップ取込</button><input id="file" type="file" accept=".json" style="display:none"><div id="count" class="note"></div></section>
+<section class="card"><h2>登録一覧</h2><div id="list"></div></section>
+</main>
+<script>
+var KEY='abook1';var data=[];var editing='';
+function q(id){return document.getElementById(id)}
+function v(id){return q(id).value.trim()}function sv(id,x){q(id).value=x||''}
+function load(){try{data=JSON.parse(localStorage.getItem(KEY)||'[]')}catch(e){data=[]}}
+function saveStore(){localStorage.setItem(KEY,JSON.stringify(data))}
+function show(s){q('status').textContent=s}
+function esc(s){return String(s||'').replace(/[&<>]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;'}[c]})}
+function clearForm(){editing='';q('mode').textContent='新規登録';['name','company','tel','email','address','memo'].forEach(function(id){sv(id,'')})}
+function save(){var c={id:editing||String(Date.now()),name:v('name'),company:v('company'),tel:v('tel'),email:v('email'),address:v('address'),memo:v('memo'),updated:new Date().toLocaleString('ja-JP')};if(!c.name&&!c.company&&!c.tel&&!c.email&&!c.address&&!c.memo){show('何か1つ入力してください');return}if(editing){data=data.map(function(x){return x.id==editing?c:x})}else{data.unshift(c)}saveStore();clearForm();render();show('保存しました')}
+function edit(id){var c=data.find(function(x){return x.id==id});if(!c)return;editing=id;q('mode').textContent='編集';['name','company','tel','email','address','memo'].forEach(function(k){sv(k,c[k])});scrollTo(0,0)}
+function del(id){data=data.filter(function(x){return x.id!=id});saveStore();render();show('削除しました')}
+function render(){var s=v('search').toLowerCase();var arr=data.filter(function(c){return [c.name,c.company,c.tel,c.email,c.address,c.memo].join(' ').toLowerCase().indexOf(s)>=0});q('count').textContent='登録 '+data.length+'件 / 表示 '+arr.length+'件';if(!arr.length){q('list').innerHTML='<div class="note">登録データがありません。</div>';return}q('list').innerHTML=arr.map(function(c){var m='';if(c.company)m+='会社名: '+esc(c.company)+'\n';if(c.tel)m+='電話: '+esc(c.tel)+'\n';if(c.email)m+='メール: '+esc(c.email)+'\n';if(c.address)m+='住所: '+esc(c.address)+'\n';if(c.memo)m+='メモ: '+esc(c.memo)+'\n';m+='更新: '+esc(c.updated);return '<div class="item"><div class="name">'+esc(c.name||'(名前なし)')+'</div><div class="meta">'+m+'</div><button class="light" onclick="edit(\''+c.id+'\')">編集</button><button class="red" onclick="del(\''+c.id+'\')">削除</button></div>'}).join('')}
+function dl(name,text,type){var b=new Blob([text],{type:type});var u=URL.createObjectURL(b);var a=document.createElement('a');a.href=u;a.download=name;a.click();setTimeout(function(){URL.revokeObjectURL(u)},500)}
+function backup(){dl('addressbook.json',JSON.stringify(data,null,2),'application/json')}
+function csv(){var rows=[['氏名','会社名','電話番号','メール','住所','メモ','更新日']].concat(data.map(function(c){return [c.name,c.company,c.tel,c.email,c.address,c.memo,c.updated]}));var text=rows.map(function(r){return r.map(function(x){return '"'+String(x||'').replace(/"/g,'""')+'"'}).join(',')}).join('\r\n');dl('addressbook.csv','\ufeff'+text,'text/csv')}
+function restore(f){var r=new FileReader();r.onload=function(){try{var a=JSON.parse(String(r.result||'[]'));data=a.concat(data);saveStore();render();show('取り込みました')}catch(e){show('取込できません')}};r.readAsText(f,'utf-8')}
+q('save').onclick=save;q('clear').onclick=function(){clearForm();show('入力を消しました')};q('search').oninput=render;q('backup').onclick=backup;q('csv').onclick=csv;q('restore').onclick=function(){q('file').click()};q('file').onchange=function(e){if(e.target.files[0])restore(e.target.files[0]);e.target.value=''};load();render();
+</script>
+</body>
+</html>
