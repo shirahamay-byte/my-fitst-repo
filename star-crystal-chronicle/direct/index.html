@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,minimum-scale=1,user-scalable=no,viewport-fit=cover">
+<meta name="theme-color" content="#050812">
+<title>星晶のクロニクル</title>
+<style>
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent;touch-action:none}
+html,body{position:fixed;inset:0;margin:0;width:100%;height:100%;overflow:hidden;background:#050812;color:#fff;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+body{height:100dvh;display:grid;place-items:center}
+#box{text-align:center;padding:28px;max-width:520px}
+#title{font-size:31px;font-weight:900;letter-spacing:.07em;color:#bddcff}
+#status{margin-top:18px;line-height:1.8;font-size:16px}
+#bar{width:min(74vw,380px);height:10px;margin:18px auto;border:1px solid #7eb5ff;border-radius:99px;overflow:hidden;background:#10182c}
+#fill{height:100%;width:4%;background:linear-gradient(90deg,#4e8cff,#8ee9ff);transition:width .2s}
+button{display:none;margin-top:14px;border:1px solid #9bc9ff;border-radius:999px;padding:12px 25px;background:#14264e;color:#fff;font:inherit;font-weight:900}
+small{color:#b9c7e8}
+</style>
+</head>
+<body>
+<div id="box"><div id="title">星晶のクロニクル</div><div id="status">ゲーム本体を読み込んでいます</div><div id="bar"><div id="fill"></div></div><button id="retry">再読み込み</button></div>
+<script>
+(()=>{
+'use strict';
+const status=document.getElementById('status'),fill=document.getElementById('fill'),retry=document.getElementById('retry');
+const files=Array.from({length:8},(_,i)=>`part${i}.txt`);
+function fail(e){console.error(e);status.innerHTML='起動に失敗しました<br><small>'+String(e&&e.message||e)+'</small>';fill.style.width='0%';retry.style.display='inline-block'}
+async function boot(){
+ retry.style.display='none';status.textContent='ゲーム本体を読み込んでいます';fill.style.width='5%';
+ try{
+  const chunks=[];
+  for(let i=0;i<files.length;i++){
+   const r=await fetch(files[i]+'?v=3',{cache:'no-store'});
+   if(!r.ok)throw new Error('データ'+(i+1)+'を取得できません: '+r.status);
+   chunks.push(await r.text());fill.style.width=(10+(i+1)*7)+'%';
+  }
+  let b64=chunks.join('').replace(/[^A-Za-z0-9+/=]/g,'');
+  if(b64.length!==19972)throw new Error('データ長が不正です: '+b64.length);
+  while(b64.length%4)b64+='=';
+  const raw=atob(b64),bytes=new Uint8Array(raw.length);
+  for(let i=0;i<raw.length;i++)bytes[i]=raw.charCodeAt(i);
+  if(!('DecompressionStream' in window))throw new Error('このブラウザーは展開処理に対応していません。Safariで開いてください');
+  fill.style.width='82%';status.textContent='冒険世界を展開しています';
+  const stream=new Blob([bytes]).stream().pipeThrough(new DecompressionStream('gzip'));
+  const html=await new Response(stream).text();
+  if(!html.includes('<title>星晶のクロニクル</title>')||html.length<30000)throw new Error('展開後のゲームデータが不正です');
+  fill.style.width='100%';status.textContent='起動します';
+  setTimeout(()=>{document.open();document.write(html);document.close()},80);
+ }catch(e){fail(e)}
+}
+retry.addEventListener('click',boot);
+['touchmove','gesturestart','gesturechange','gestureend','dblclick','contextmenu'].forEach(n=>document.addEventListener(n,e=>e.preventDefault(),{passive:false}));
+boot();
+})();
+</script>
+</body>
+</html>
