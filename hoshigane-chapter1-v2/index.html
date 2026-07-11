@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,minimum-scale=1,user-scalable=no,viewport-fit=cover">
+<meta name="theme-color" content="#050814">
+<title>星鐘のクロニクル 改訂版</title>
+<style>
+*{box-sizing:border-box;touch-action:none;-webkit-tap-highlight-color:transparent}
+html,body{position:fixed;inset:0;margin:0;width:100%;height:100%;overflow:hidden;background:#050814;color:#fff;font-family:-apple-system,sans-serif}
+body{display:grid;place-items:center;height:100dvh}#box{text-align:center;padding:24px;max-width:520px}h1{color:#bfe0ff;margin:0 0 10px}
+#bar{width:min(75vw,380px);height:10px;border:1px solid #8fc3ff;border-radius:99px;overflow:hidden;background:#111a2e;margin:18px auto}#fill{height:100%;width:5%;background:linear-gradient(90deg,#4f8cff,#8feaff);transition:width .15s}
+button{display:none;margin-top:16px;border:1px solid #9bc9ff;border-radius:999px;padding:12px 24px;background:#14264e;color:#fff;font:inherit;font-weight:900}small{color:#bac8e6}
+</style>
+</head>
+<body>
+<div id="box"><h1>星鐘のクロニクル</h1><div id="status">改訂版を読み込んでいます</div><div id="bar"><div id="fill"></div></div><button id="retry">再読み込み</button></div>
+<script>
+(()=>{
+'use strict';
+const status=document.getElementById('status'),fill=document.getElementById('fill'),retry=document.getElementById('retry');
+async function boot(){
+ retry.style.display='none';fill.style.width='5%';status.textContent='改訂版を読み込んでいます';
+ try{
+  const parts=[];
+  for(let i=0;i<6;i++){
+   const r=await fetch('data'+i+'.txt?v=1',{cache:'no-store'});
+   if(!r.ok)throw new Error('データ'+(i+1)+'を取得できません: '+r.status);
+   parts.push((await r.text()).replace(/\s/g,''));fill.style.width=(12+(i+1)*10)+'%';
+  }
+  const hex=parts.join('');
+  if(hex.length!==42396||!/^[0-9a-f]+$/i.test(hex))throw new Error('ゲームデータが不正です: '+hex.length);
+  const bytes=new Uint8Array(hex.length/2);
+  for(let i=0;i<bytes.length;i++)bytes[i]=parseInt(hex.slice(i*2,i*2+2),16);
+  if(!('DecompressionStream' in window))throw new Error('Safariを最新版にしてください');
+  fill.style.width='82%';status.textContent='冒険世界を展開しています';
+  const stream=new Blob([bytes]).stream().pipeThrough(new DecompressionStream('gzip'));
+  const html=await new Response(stream).text();
+  if(html.length!==58754||!html.includes('顔の見える戦士ドット絵'))throw new Error('展開後のデータを確認できません: '+html.length);
+  fill.style.width='100%';status.textContent='起動します';
+  setTimeout(()=>{document.open();document.write(html);document.close()},80);
+ }catch(e){console.error(e);status.innerHTML='起動に失敗しました<br><small>'+String(e.message||e)+'</small>';fill.style.width='0%';retry.style.display='inline-block'}
+}
+retry.addEventListener('click',boot);
+['touchmove','gesturestart','gesturechange','gestureend','dblclick','contextmenu'].forEach(n=>document.addEventListener(n,e=>e.preventDefault(),{passive:false}));
+boot();
+})();
+</script>
+</body>
+</html>
